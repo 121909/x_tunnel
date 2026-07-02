@@ -1,0 +1,85 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_NDK_VERSION: 29.0.14206865
+      BUILD_TOOLS_VERSION: 34.0.0
+      XTUNNEL_RELEASE_STORE_FILE: signing/xtunnel-release.jks
+      XTUNNEL_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      XTUNNEL_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      XTUNNEL_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;29.0.14206865"
+
+      - name: Install gomobile tools
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+
+      - name: Prepare signing material
+        shell: bash
+        run: |
+          test -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" || { echo "Missing secret ANDROID_KEYSTORE_BASE64"; exit 1; }
+          test -n "${XTUNNEL_RELEASE_STORE_PASSWORD}" || { echo "Missing secret ANDROID_STORE_PASSWORD"; exit 1; }
+          test -n "${XTUNNEL_RELEASE_KEY_ALIAS}" || { echo "Missing secret ANDROID_KEY_ALIAS"; exit 1; }
+          test -n "${XTUNNEL_RELEASE_KEY_PASSWORD}" || { echo "Missing secret ANDROID_KEY_PASSWORD"; exit 1; }
+          mkdir -p android/signing
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/signing/xtunnel-release.jks
+
+      - name: Build signed release artifacts
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.ANDROID_NDK_VERSION }}
+        run: ./tools/build-android-release.sh
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xtunnel-release-artifacts
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/libs/xtunnel.aar
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/libs/xtunnel.aar

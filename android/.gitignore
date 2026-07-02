@@ -1,0 +1,9 @@
+/.gradle/
+/build/
+/app/build/
+/app/libs/*
+!/app/libs/.gitkeep
+/signing/*
+!/signing/.gitkeep
+keystore.properties
+local.properties

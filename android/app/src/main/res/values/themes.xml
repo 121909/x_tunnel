@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.XTunnel" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/hero_surface</item>
+        <item name="colorOnPrimary">@color/hero_text</item>
+        <item name="colorSecondary">@color/hero_accent</item>
+        <item name="android:statusBarColor">@color/canvas</item>
+        <item name="android:navigationBarColor">@color/canvas</item>
+        <item name="android:windowBackground">@color/canvas</item>
+        <item name="colorSurface">@android:color/white</item>
+    </style>
+</resources>
